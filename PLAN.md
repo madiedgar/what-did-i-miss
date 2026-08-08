@@ -7,20 +7,20 @@ Humans do only what Devin can't: accounts, keys, dashboards, PR review/merge, de
 
 | # | Role | Owns |
 |---|------|------|
-| 1 | **Lead / repo & deploy** | Push this repo to GitHub, connect Devin to it, create Railway project + set all env vars, deploy early and often, own `APP_URL` |
+| 1 | **Lead / repo & deploy** | Push this repo to GitHub, connect Devin to it, collect all keys into a local `.env`, run the app on their laptop (`caffeinate -i npm start`) behind a Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:3000`), own `APP_URL`, re-run `npm run set-app-url` if the tunnel ever restarts |
 | 2 | **ElevenLabs owner** | Create the agent in the dashboard: system prompt + 6 webhook tools (below), pick voice, test in dashboard playground |
-| 3 | **Telegram owner** | BotFather: create bot, **disable privacy mode** (`/setprivacy` → Disable), make demo group, get `TELEGRAM_CHAT_ID`, call `setWebhook` with `secret_token` once deployed |
+| 3 | **Telegram owner** | BotFather: create bot, **disable privacy mode** (`/setprivacy` → Disable), make demo group, get `TELEGRAM_CHAT_ID`, call `setWebhook` with `secret_token` once the tunnel is up (or let `npm run set-app-url` do it) |
 | 4 | **Devin wrangler A** | Kick off Session 0 immediately; when merged, kick Sessions 1 & 2; steer, answer Devin's questions, review + merge those PRs |
-| 5 | **Devin wrangler B** | When Session 0 merges, kick Sessions 3 & 4; steer, review + merge |
+| 5 | **Devin wrangler B** | When Session 0 merges, kick Sessions 3 & 4; steer, review + merge. (Session 5 — local deploy — is already implemented in-repo, no dispatch needed) |
 | 6 | **Demo owner** | Author `transcript.json` (must contain: one factual claim verifiable at a public URL, one clearly-scoped dev task, 2–3 discussion topics); write + run the demo script; rehearse |
 
 ## Timeline
 
-- **0:00–0:15** — Lead pushes repo + connects Devin; Wrangler A starts Session 0 (paste `devin-prompts/00-scaffold-core.md` with real repo URL). Everyone else starts their dashboard/account work in parallel. All keys collected into Railway env.
+- **0:00–0:15** — Lead pushes repo + connects Devin; Wrangler A starts Session 0 (paste `devin-prompts/00-scaffold-core.md` with real repo URL). Everyone else starts their dashboard/account work in parallel. All keys collected into the Lead's `.env`.
 - **0:15–0:50** — Session 0 runs. ElevenLabs agent + tools configured (they can be fully configured before the endpoints exist). Telegram bot created. Demo owner drafts transcript.
-- **0:50–1:00** — Review + merge Session 0 PR. Lead deploys to Railway → `APP_URL` live → Telegram `setWebhook` → verify a group message lands in the DB.
-- **1:00–1:50** — Sessions 1–4 run **in parallel** (disjoint files; the only overlap is one route-mount line each in `index.ts` — trivial merges). Wranglers review and merge as each finishes; Lead redeploys per merge.
-- **1:50–2:20** — Integration: run `npm run seed` on Railway, `/catchup` in the group, full voice session — hit all three moments (digest, verify, dispatch). Fix small things directly; send Devin a follow-up message in the relevant session for anything bigger.
+- **0:50–1:00** — Review + merge Session 0 PR. Lead starts the app locally + the cloudflared quick tunnel → `APP_URL` live → `npm run set-app-url` (or manual `setWebhook`) → verify a group message lands in the DB. Leave the tunnel running from here on.
+- **1:00–1:50** — Sessions 1–4 run **in parallel** (disjoint files; the only overlap is one route-mount line each in `index.ts` — trivial merges). Wranglers review and merge as each finishes; Lead pulls + restarts the local server per merge (tunnel stays up, `APP_URL` unchanged).
+- **1:50–2:20** — Integration: run `npm run seed` locally, `/catchup` in the group, full voice session — hit all three moments (digest, verify, dispatch). Fix small things directly; send Devin a follow-up message in the relevant session for anything bigger.
 - **2:20–2:45** — Rehearse the demo twice end-to-end. **Freeze at 2:45.** No merges after freeze.
 - **2:45–3:00** — Buffer / breathe.
 
@@ -53,9 +53,11 @@ Humans do only what Devin can't: accounts, keys, dashboards, PR review/merge, de
 
 Dynamic variables to declare: `user_id, user_name, missed_count, since_human, missed_transcript`.
 
+Don't have the tunnel URL yet? Configure the tools with a placeholder origin (e.g. `https://placeholder.local/tools/<name>`) — `npm run set-app-url` rewrites every tool URL's origin to the live `APP_URL` once the tunnel is up.
+
 ## Integration checklist (1:50)
 
-- [ ] Group message → row in `messages` (check Railway logs / sqlite)
+- [ ] Group message → row in `messages` (check server logs / `data.db`)
 - [ ] `/catchup` → link arrives, page connects, agent greets by name with real digest
 - [ ] "What did people say about &lt;topic&gt;?" → quotes real seeded messages
 - [ ] "Is it true that &lt;claim&gt;?" → verify moment cites the source
@@ -73,6 +75,7 @@ Dynamic variables to declare: `user_id, user_name, missed_count, since_human, mi
 ## Known risks
 
 - **Telegram privacy mode** silently hides group messages from the bot — disable it in minute one and verify ingestion before anything else.
+- **The quick-tunnel URL is ephemeral** — it changes every time cloudflared restarts (restarting `npm start` is fine). Start the tunnel once at 0:50 and leave it running; if it dies, re-run `npm run set-app-url` and send a fresh `/catchup` (old links embed the dead URL). Keep the demo laptop awake (`caffeinate -i npm start`) and on reliable wifi.
 - **The verification claim must be refutable from scraped *text*.** Context.dev returns markdown, so anything a page conveys only through colour, layout, or a chart image is invisible to the agent. The transcript's Node LTS claim points at `github.com/nodejs/Release`, whose README says `22.x | Maintenance LTS` and `24.x | Active LTS` in literal table text. `nodejs.org/en/about/previous-releases` looks like the obvious source and is a trap — it labels both versions simply "LTS" and draws the Active-vs-Maintenance split in an SVG, so the agent would *confirm* the false claim on stage. If you change the claim, re-check the replacement page's scraped text first.
 - ElevenLabs SDK signatures drift — Session 1's prompt tells Devin to read current docs, and person 2 can sanity-test the agent in the dashboard playground independent of our page.
 - Devin PR quality varies under time pressure — wranglers review diffs against README contracts, not vibes; small fixes are faster by hand than by follow-up prompt.

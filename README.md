@@ -19,7 +19,7 @@ back into the Telegram group.
 - `better-sqlite3` for storage (single file `data.db`, no ORM)
 - ElevenLabs Agents platform (agent lives in their dashboard; we host tool webhooks + the session page)
 - No second LLM: the agent summarizes the missed messages itself. We ship it the raw transcript.
-- Deploy: Railway (nixpacks default; `npm start` runs `tsx src/index.ts`)
+- Deploy: the Lead's laptop + a Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:3000`); `npm start` runs `tsx src/index.ts`. No paid hosting.
 - No other runtime dependencies without a very good reason. No test framework — curl smokes only.
 
 ## Repo layout & file ownership
@@ -37,8 +37,11 @@ src/
                   # mark_caught_up                              [Session 4]
 public/
   session.html    # voice page (ElevenLabs JS SDK)              [Session 1]
+scripts/
+  set-app-url.ts  # re-point Telegram + ElevenLabs at APP_URL   [Session 5]
 seed.ts           # transcript.json -> DB                       [Session 0]
 transcript.json   # authored by demo owner (human)              [human]
+.env.example      # every env var, commented, no values         [Session 5]
 ```
 
 **Devin sessions: only touch the files tagged with your session number.** Open a PR from
@@ -46,8 +49,9 @@ branch `devin/session-<n>`; never push to main.
 
 ## Environment variables (exact names)
 
-Copy `.env.example` to `.env` and fill it in — `npm start` and `npm run seed` load it via
-`--env-file-if-exists`. On Railway there is no `.env`; set the same names in the Variables tab.
+Copy `.env.example` to `.env` and fill it in — `npm start`, `npm run seed`, and
+`npm run set-app-url` load it via `--env-file-if-exists`. `.env` lives only on the
+Lead's machine; there is no hosted environment.
 
 ```
 TELEGRAM_TOKEN            # from BotFather
@@ -59,7 +63,7 @@ CONTEXT_DEV_KEY
 DEVIN_API_KEY
 TOOL_SECRET               # shared secret for /tools/* auth
 SESSION_JWT_SECRET        # signs /catchup links
-APP_URL                   # public Railway URL, no trailing slash
+APP_URL                   # public tunnel URL (https://….trycloudflare.com), no trailing slash
 ```
 
 ## Database schema (db.ts creates on boot)
@@ -181,6 +185,15 @@ upsert `user_markers` with now → `{ ok: true }`.
 (`[{ sender, text, minutes_ago }]`), insert into `messages` with synthetic ascending
 `message_id` starting at 1000, `chat_id = TELEGRAM_CHAT_ID`. Wipes existing seeded rows
 (message_id 1000–1999) first so it's re-runnable.
+
+### `npm run set-app-url` — [Session 5]
+`scripts/set-app-url.ts`: one command that re-points the outside world at the current
+`APP_URL` (the quick-tunnel URL changes every time cloudflared restarts):
+1. Telegram: call `setWebhook` with url `{APP_URL}/telegram/webhook` and
+   `secret_token = TELEGRAM_WEBHOOK_SECRET`; treat `ok: false` as failure.
+2. ElevenLabs: fetch the agent's webhook tools and rewrite each tool URL whose path
+   starts with `/tools/` so its origin becomes `APP_URL`, preserving the path.
+Print every URL it changed; exit non-zero with a readable message on any failure.
 
 ## Error-handling floor (don't build more than this)
 

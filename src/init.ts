@@ -1,10 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { Hono } from 'hono';
 import jwt from 'jsonwebtoken';
 import { getMessagesSince, type Message } from './db.js';
 
-const MODEL = 'claude-sonnet-5';
 const MESSAGE_CAP = 500;
+/** Dynamic variables ride in the agent's prompt; keep the transcript from crowding it out. */
+const TRANSCRIPT_CHAR_CAP = 6000;
 
 type SessionClaims = {
   user_id: string;
@@ -13,29 +13,10 @@ type SessionClaims = {
   since: number;
 };
 
-type Digest = {
-  overview: string;
-  topics: string[];
-  action_items: string[];
-};
-
-const DIGEST_PROMPT = `You are briefing someone who has been away from a group chat.
-Read the transcript and reply with ONLY a JSON object, no prose and no code fences:
-{"overview": string, "topics": string[], "action_items": string[]}
-- overview: 3-5 sentences, spoken-word friendly, naming who said what about the important things.
-- topics: 3-6 short topic labels.
-- action_items: things someone needs to do or decide, phrased as imperatives. Empty array if none.`;
-
 function claims(token: string): SessionClaims {
   return jwt.verify(token, process.env.SESSION_JWT_SECRET as string, {
     algorithms: ['HS256'],
   }) as SessionClaims;
-}
-
-function transcript(messages: Message[]): string {
-  return messages
-    .map((m) => `[${new Date(m.sent_at * 1000).toISOString()}] ${m.sender}: ${m.text}`)
-    .join('\n');
 }
 
 /** "yesterday 3pm", "today 9am", "Tuesday 4pm", or "12 Mar 4pm" for anything older than a week. */
@@ -59,55 +40,21 @@ export function humanizeSince(sinceTs: number, now = Date.now()): string {
   return `${then.getDate()} ${then.toLocaleDateString('en-US', { month: 'short' })} ${clock}`;
 }
 
-function strings(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === 'string' && v.trim() !== '');
-}
+/**
+ * The missed messages as one speakable block for the agent to summarize itself.
+ * Oldest first so the story reads forwards; when capped, the newest are kept.
+ */
+export function missedTranscript(messages: Message[], now = Date.now()): string {
+  if (messages.length === 0) return '(nothing new since they last caught up)';
 
-function parseDigest(raw: string): Digest {
-  const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '');
-  const start = stripped.indexOf('{');
-  const end = stripped.lastIndexOf('}');
-  if (start !== -1 && end > start) {
-    try {
-      const parsed = JSON.parse(stripped.slice(start, end + 1)) as Partial<Digest>;
-      const overview = typeof parsed.overview === 'string' ? parsed.overview.trim() : '';
-      if (overview) {
-        return { overview, topics: strings(parsed.topics), action_items: strings(parsed.action_items) };
-      }
-    } catch {
-      // fall through to raw text
-    }
+  const lines = messages.map((m) => `${humanizeSince(m.sent_at, now)} — ${m.sender}: ${m.text}`);
+
+  let out = lines.join('\n');
+  while (out.length > TRANSCRIPT_CHAR_CAP && lines.length > 1) {
+    lines.shift();
+    out = `(earlier messages omitted)\n${lines.join('\n')}`;
   }
-  return { overview: raw.trim(), topics: [], action_items: [] };
-}
-
-let client: Anthropic | undefined;
-
-/** Lazy so a missing key doesn't break boot — only /api/conversation-init needs it. */
-function anthropic(): Anthropic {
-  client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return client;
-}
-
-async function digestOf(messages: Message[]): Promise<Digest> {
-  if (messages.length === 0) {
-    return { overview: "Nothing new since you last caught up — you're all clear.", topics: [], action_items: [] };
-  }
-
-  const res = await anthropic().messages.create({
-    model: MODEL,
-    max_tokens: 1500,
-    system: DIGEST_PROMPT,
-    messages: [{ role: 'user', content: `Transcript of ${messages.length} missed messages:\n\n${transcript(messages)}` }],
-  });
-
-  const text = res.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n');
-
-  return parseDigest(text);
+  return out.slice(0, TRANSCRIPT_CHAR_CAP);
 }
 
 async function conversationToken(): Promise<string> {
@@ -137,7 +84,6 @@ init.post('/', async (c) => {
   const messages = getMessagesSince(session.chat_id, session.since, MESSAGE_CAP);
 
   try {
-    const digest = await digestOf(messages);
     const token = await conversationToken();
     return c.json({
       conversation_token: token,
@@ -146,9 +92,7 @@ init.post('/', async (c) => {
         user_name: session.user_name,
         missed_count: messages.length,
         since_human: humanizeSince(session.since),
-        digest_overview: digest.overview,
-        digest_topics: digest.topics.join(', '),
-        digest_action_items: digest.action_items.map((a, i) => `${i + 1}. ${a}`).join(' '),
+        missed_transcript: missedTranscript(messages),
       },
     });
   } catch (err) {

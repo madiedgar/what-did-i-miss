@@ -7,12 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "tsx src/index.ts",
-    "seed": "tsx seed.ts",
+    "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "seed": "tsx --env-file-if-exists=.env seed.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
     "@hono/node-server": "^2.0.12",
     "better-sqlite3": "^12.11.1",
     "hono": "^4.12.33",

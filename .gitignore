@@ -5,6 +5,7 @@ data.db-wal
 data.db-shm
 .env
 .env.*
+!.env.example
 dist/
 *.log
 .DS_Store

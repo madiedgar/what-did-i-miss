@@ -37,7 +37,8 @@ chat.post('/search_chat', async (c) => {
     const results = searchMessages(query, since_ts, 20).map(toToolMessage);
     return c.json({ results });
   } catch (e) {
-    return c.json({ error: `bad request: search failed (${(e as Error).message})` });
+    console.error('search_chat failed:', e);
+    return c.json({ error: 'bad request: search failed' });
   }
 });
 
@@ -59,6 +60,7 @@ chat.post('/get_messages', async (c) => {
     const messages = getMessagesRange(from_id as number, to_id as number).map(toToolMessage);
     return c.json({ messages });
   } catch (e) {
-    return c.json({ error: `bad request: lookup failed (${(e as Error).message})` });
+    console.error('get_messages failed:', e);
+    return c.json({ error: 'bad request: lookup failed' });
   }
 });

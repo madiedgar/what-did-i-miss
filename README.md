@@ -164,7 +164,7 @@ Body: `{ title: string, details: string }`
 4. → `{ devin_session_id, url }`. On Devin API failure → 200 with `{ error: "<human-readable reason>" }`.
 
 ### `POST /tools/check_devin_sessions` — [Session 4]
-Body: `{}` → poll `GET https://api.devin.ai/v1/session/{id}` for each stored session,
+Body: `{}` → poll `GET https://api.devin.ai/v1/sessions/{id}` for each stored session,
 update statuses → `{ sessions: [{ title, status, url }] }`.
 
 ### `POST /tools/mark_caught_up` — [Session 4]

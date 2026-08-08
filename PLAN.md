@@ -73,6 +73,7 @@ Dynamic variables to declare: `user_id, user_name, missed_count, since_human, mi
 ## Known risks
 
 - **Telegram privacy mode** silently hides group messages from the bot — disable it in minute one and verify ingestion before anything else.
+- **The verification claim must be refutable from scraped *text*.** Context.dev returns markdown, so anything a page conveys only through colour, layout, or a chart image is invisible to the agent. The transcript's Node LTS claim points at `github.com/nodejs/Release`, whose README says `22.x | Maintenance LTS` and `24.x | Active LTS` in literal table text. `nodejs.org/en/about/previous-releases` looks like the obvious source and is a trap — it labels both versions simply "LTS" and draws the Active-vs-Maintenance split in an SVG, so the agent would *confirm* the false claim on stage. If you change the claim, re-check the replacement page's scraped text first.
 - ElevenLabs SDK signatures drift — Session 1's prompt tells Devin to read current docs, and person 2 can sanity-test the agent in the dashboard playground independent of our page.
 - Devin PR quality varies under time pressure — wranglers review diffs against README contracts, not vibes; small fixes are faster by hand than by follow-up prompt.
 - If Session 1 (voice page) runs long, fallback demo: test the agent via the ElevenLabs dashboard playground with dynamic variables pasted manually — every tool still fires.

@@ -16,7 +16,7 @@
   },
   {
     "sender": "Dana",
-    "text": "Separate topic — for the pricing page I want to claim we're built on the newest Node LTS. Node 22 is the current LTS release, right? https://nodejs.org/en/about/previous-releases",
+    "text": "Separate topic — for the pricing page I want to say we're built on the newest Node LTS. Node 22 is still the Active LTS line, right? Schedule lives here: https://github.com/nodejs/Release",
     "minutes_ago": 180
   },
   {

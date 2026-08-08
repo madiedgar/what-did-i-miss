@@ -4,11 +4,226 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>What Did I Miss</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d0f14;
+        --fg: #f2f4f8;
+        --muted: #8b94a7;
+        --accent: #6ee7a8;
+        --speak: #7aa2ff;
+        --error: #ff8a8a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+      }
+      main {
+        width: min(30rem, 92vw);
+        padding: 2rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 2.5rem;
+      }
+      #orb {
+        width: 8.5rem;
+        height: 8.5rem;
+        margin: 0 auto 1.75rem;
+        border-radius: 50%;
+        background: #1a1f2b;
+        border: 2px solid #2a3242;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      }
+      body[data-state='connecting'] #orb {
+        border-color: var(--muted);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      body[data-state='listening'] #orb {
+        border-color: var(--accent);
+        box-shadow: 0 0 3rem -0.5rem var(--accent);
+      }
+      body[data-state='speaking'] #orb {
+        border-color: var(--speak);
+        box-shadow: 0 0 4rem -0.25rem var(--speak);
+        animation: pulse 1s ease-in-out infinite;
+      }
+      body[data-state='error'] #orb,
+      body[data-state='ended'] #orb {
+        border-color: #2a3242;
+        opacity: 0.4;
+      }
+      @keyframes pulse {
+        50% {
+          transform: scale(1.06);
+        }
+      }
+      #status {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem;
+      }
+      body[data-state='error'] #status {
+        color: var(--error);
+      }
+      #detail {
+        color: var(--muted);
+        margin: 0 0 2rem;
+        min-height: 1.5rem;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: var(--fg);
+        background: #1a1f2b;
+        border: 1px solid #2a3242;
+        border-radius: 999px;
+        padding: 0.7rem 2rem;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--muted);
+      }
+      button[hidden] {
+        display: none;
+      }
+    </style>
   </head>
-  <body>
+  <body data-state="connecting">
     <main>
       <h1>What Did I Miss</h1>
-      <p>voice page coming</p>
+      <div id="orb"></div>
+      <p id="status">Connecting…</p>
+      <p id="detail"></p>
+      <button id="end" hidden>End call</button>
     </main>
+
+    <script type="module">
+      const SDK_URL = 'https://esm.sh/@elevenlabs/client@1.17.0';
+
+      const statusEl = document.getElementById('status');
+      const detailEl = document.getElementById('detail');
+      const endBtn = document.getElementById('end');
+
+      let conversation = null;
+      let failed = false;
+
+      function render(state, status, detail = '') {
+        document.body.dataset.state = state;
+        statusEl.textContent = status;
+        detailEl.textContent = detail;
+      }
+
+      function fail(status, detail) {
+        failed = true;
+        endBtn.hidden = true;
+        render('error', status, detail);
+      }
+
+      async function teardown() {
+        try {
+          await conversation?.endSession();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function main() {
+        const token = new URLSearchParams(location.search).get('t');
+        if (!token) {
+          fail('No session link', 'Ask the bot for a fresh link.');
+          return;
+        }
+
+        const res = await fetch('/api/conversation-init', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+
+        if (res.status === 401) {
+          fail('Link expired', 'Ask the bot for a fresh link.');
+          return;
+        }
+        if (!res.ok) {
+          fail("Couldn't start the session", 'Something went wrong on our side. Try again in a moment.');
+          return;
+        }
+
+        const { conversation_token: conversationToken, dynamic_variables: dynamicVariables } = await res.json();
+        render(
+          'connecting',
+          'Connecting…',
+          `${dynamicVariables.missed_count} messages since ${dynamicVariables.since_human}`,
+        );
+
+        // Permission probe only — the SDK opens its own stream, so release this one immediately.
+        const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+        probe.getTracks().forEach((track) => track.stop());
+
+        // Dynamic so a CDN failure surfaces in the error UI instead of killing the module.
+        const { Conversation } = await import(SDK_URL);
+
+        conversation = await Conversation.startSession({
+          conversationToken,
+          dynamicVariables,
+          connectionType: 'webrtc',
+          onModeChange: ({ mode }) =>
+            render(
+              mode === 'speaking' ? 'speaking' : 'listening',
+              mode === 'speaking' ? 'Speaking…' : 'Listening…',
+              detailEl.textContent,
+            ),
+          onStatusChange: ({ status }) => {
+            if (status === 'connecting') render('connecting', 'Connecting…', detailEl.textContent);
+            if (status === 'connected') render('listening', 'Listening…', detailEl.textContent);
+            // onError fires before the socket closes; don't clobber the reason with "Call ended".
+            if (status === 'disconnected' && !failed) {
+              endBtn.hidden = true;
+              render('ended', 'Call ended', 'Send /catchup in the chat to start another.');
+            }
+          },
+          onError: (message) => {
+            fail('Something went wrong', message ?? 'The call dropped unexpectedly.');
+            void teardown();
+          },
+        });
+
+        if (!failed) endBtn.hidden = false;
+      }
+
+      endBtn.addEventListener('click', async () => {
+        endBtn.disabled = true;
+        try {
+          await conversation?.endSession();
+        } finally {
+          endBtn.hidden = true;
+          render('ended', 'Call ended', 'Send /catchup in the chat to start another.');
+        }
+      });
+
+      main().catch(async (err) => {
+        console.error(err);
+        await teardown();
+        const denied = err?.name === 'NotAllowedError' || /permission|denied/i.test(err?.message ?? '');
+        fail(
+          denied ? 'Microphone blocked' : "Couldn't start the session",
+          denied ? 'Allow microphone access, then reload this page.' : (err?.message ?? 'Please reload the page.'),
+        );
+      });
+    </script>
   </body>
 </html>

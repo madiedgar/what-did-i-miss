@@ -144,7 +144,8 @@ init.post('/', async (c) => {
       },
     });
   } catch (err) {
+    // Upstream messages can carry provider diagnostics — log them, don't ship them.
     console.error('conversation-init failed', err);
-    return c.json({ error: err instanceof Error ? err.message : 'conversation init failed' }, 502);
+    return c.json({ error: 'could not start the conversation' }, 502);
   }
 });

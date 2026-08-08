@@ -1,5 +1,7 @@
 # What Did I Miss
 
+demo link: [see it live here](https://www.loom.com/share/5448880ff85f430a9e7285d25a68139f) 
+
 Come back from a day away and your Telegram group has 200 new messages. Instead of scrolling,
 you type `/catchup` and the bot hands you a link. The link opens a voice session with **Recap**,
 an agent that has already read everything you missed. It greets you by name, sums up the chat in

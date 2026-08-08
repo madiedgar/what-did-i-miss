@@ -16,7 +16,7 @@
   },
   {
     "sender": "Dana",
-    "text": "Separate topic — for the pricing page I want to say we're built on the newest Node LTS. Node 22 is still the Active LTS line, right? Schedule lives here: https://github.com/nodejs/Release",
+    "text": "Separate topic — for the pricing page I want to say we're built on the newest Node LTS. Node 22 is still the Active LTS line, right? Release table's here: https://raw.githubusercontent.com/nodejs/Release/main/README.md",
     "minutes_ago": 180
   },
   {

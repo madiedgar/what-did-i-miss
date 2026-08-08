@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "seed": "tsx --env-file-if-exists=.env seed.ts",
+    "set-app-url": "tsx --env-file-if-exists=.env scripts/set-app-url.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

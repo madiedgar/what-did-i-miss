@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "seed.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "seed.ts"]
 }

@@ -56,13 +56,16 @@ async function scrapeMarkdown(
   signal: AbortSignal,
   remainingMs: number,
 ): Promise<{ markdown: string; url: string }> {
-  const params = {
+  const options = {
     url,
-    useMainContentOnly: 'true',
-    includeImages: 'false',
-    timeoutMS: String(Math.max(1, remainingMs)),
+    useMainContentOnly: true,
+    includeImages: false,
+    timeoutMS: Math.max(1, remainingMs),
   };
-  let res = await fetch(`${CONTEXT_API}/web/scrape/markdown?${new URLSearchParams(params).toString()}`, {
+  const query = new URLSearchParams(
+    Object.entries(options).map(([k, v]) => [k, String(v)]),
+  );
+  let res = await fetch(`${CONTEXT_API}/web/scrape/markdown?${query.toString()}`, {
     headers: { authorization: `Bearer ${apiKey}` },
     signal,
   });
@@ -75,7 +78,7 @@ async function scrapeMarkdown(
     res = await fetch(`${CONTEXT_ROOT}/web/scrape/markdown`, {
       method: 'POST',
       headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify(params),
+      body: JSON.stringify(options),
       signal,
     });
   }

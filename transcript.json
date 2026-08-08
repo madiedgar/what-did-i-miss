@@ -1,0 +1,42 @@
+[
+  {
+    "sender": "Priya",
+    "text": "Morning all — kicking off the week: we ship the checkout redesign Thursday, so today is the last day for copy changes.",
+    "minutes_ago": 240
+  },
+  {
+    "sender": "Marcus",
+    "text": "Copy is locked on my side. One thing though: the signup page still crashes on Safari when you submit an empty email field.",
+    "minutes_ago": 225
+  },
+  {
+    "sender": "Priya",
+    "text": "That's a real bug. Someone should add client-side validation on the signup form so empty/invalid emails show an inline error instead of throwing.",
+    "minutes_ago": 218
+  },
+  {
+    "sender": "Dana",
+    "text": "Separate topic — for the pricing page I want to claim we're built on the newest Node LTS. Node 22 is the current LTS release, right? https://nodejs.org/en/about/previous-releases",
+    "minutes_ago": 180
+  },
+  {
+    "sender": "Marcus",
+    "text": "Pretty sure that's right but double check the release schedule before it goes on a public page.",
+    "minutes_ago": 175
+  },
+  {
+    "sender": "Dana",
+    "text": "Will do. Also the analytics dashboard numbers looked off yesterday — signups were double counted between 2 and 4pm.",
+    "minutes_ago": 120
+  },
+  {
+    "sender": "Priya",
+    "text": "Probably the duplicate event fire we saw last month. Low priority for now, let's revisit after launch.",
+    "minutes_ago": 95
+  },
+  {
+    "sender": "Marcus",
+    "text": "Agreed. Standup moved to 10:30 tomorrow so we can all be there after the deploy window.",
+    "minutes_ago": 45
+  }
+]

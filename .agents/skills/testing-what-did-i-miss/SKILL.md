@@ -1,6 +1,6 @@
 ---
 name: testing-what-did-i-miss
-description: How to run and end-to-end test the what-did-i-miss app locally (voice session page, /api/conversation-init) when the Anthropic/ElevenLabs credentials are missing.
+description: How to run and end-to-end test the what-did-i-miss app locally (voice session page, /api/conversation-init) when the ElevenLabs credentials are missing.
 ---
 
 # Testing what-did-i-miss locally
@@ -23,14 +23,17 @@ taken on the box and `npm start` exits on EADDRINUSE — `curl /health` to confi
 Gotcha: backgrounding the server from a one-shot shell call (`nohup ... &`) gets it killed when the
 call times out. Start it in a persistent shell session, or wrap in `( ... & )` and verify `/health`.
 
-## Testing without ANTHROPIC_API_KEY / ELEVENLABS_API_KEY / ELEVENLABS_AGENT_ID
+## Testing without ELEVENLABS_API_KEY / ELEVENLABS_AGENT_ID
 
-If those secrets are absent, stub the two outbound calls instead of skipping the happy path: write a
-small entry file that patches `globalThis.fetch` (match on `api.anthropic.com` / `api.elevenlabs.io`)
-and then `await import('src/index.ts')`, and run it with `npx tsx`. The ElevenLabs URL is hardcoded,
-so only a fetch patch intercepts it (`ANTHROPIC_BASE_URL` alone is not enough). Reading the stub's
-behaviour from a control file (e.g. `/tmp/stub_mode`) per request lets you flip failure modes
-(bad JSON digest, upstream 500/503, non-string digest entries) without restarting the server.
+`/api/conversation-init` makes exactly one outbound call — the ElevenLabs conversation token.
+Everything before it (JWT verification, the DB read, `missed_transcript` formatting) runs offline,
+so a 401/valid-token split is testable with no credentials at all.
+
+To exercise the happy path without keys, stub that one call: write a small entry file that patches
+`globalThis.fetch` (match on `api.elevenlabs.io`) and then `await import('src/index.ts')`, and run
+it with `npx tsx`. The ElevenLabs URL is hardcoded, so only a fetch patch intercepts it. Reading the
+stub's behaviour from a control file (e.g. `/tmp/stub_mode`) per request lets you flip failure modes
+(upstream 500/503, token-less 200 body) without restarting the server.
 
 **A stubbed conversation token cannot complete a real WebRTC handshake.** The page will reach
 `Connecting…`, then fail at `Conversation.startSession` with
@@ -56,6 +59,6 @@ NOT testable without real ElevenLabs credentials. Say so explicitly rather than 
 
 ## Devin Secrets Needed
 
-- `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` — required for a real voice
+- `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID` — required for a real voice
   conversation (listening/speaking/End-call states). Everything else is testable with stubs.
 - `TELEGRAM_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` — only needed to test the `/catchup` link delivery.

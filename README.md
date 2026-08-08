@@ -8,7 +8,7 @@ ambiguous, pick the simplest reading and keep moving.
 
 A Telegram group bot ingests every message into SQLite. A member who's been away sends
 `/catchup` and gets a link to a web page hosting an ElevenLabs voice agent that already
-knows what they missed (a digest is generated at session start). Mid-conversation the
+knows what they missed (the transcript is handed to it at session start). Mid-conversation the
 agent can search the chat, quote exact messages, verify claims against live public web
 pages via Context.dev, and dispatch actionable dev work to Devin — posting a confirmation
 back into the Telegram group.
@@ -17,8 +17,8 @@ back into the Telegram group.
 
 - Node 20 + TypeScript, [Hono](https://hono.dev) web framework
 - `better-sqlite3` for storage (single file `data.db`, no ORM)
-- `@anthropic-ai/sdk` for the digest call (model `claude-sonnet-5`)
 - ElevenLabs Agents platform (agent lives in their dashboard; we host tool webhooks + the session page)
+- No second LLM: the agent summarizes the missed messages itself. We ship it the raw transcript.
 - Deploy: Railway (nixpacks default; `npm start` runs `tsx src/index.ts`)
 - No other runtime dependencies without a very good reason. No test framework — curl smokes only.
 
@@ -46,11 +46,13 @@ branch `devin/session-<n>`; never push to main.
 
 ## Environment variables (exact names)
 
+Copy `.env.example` to `.env` and fill it in — `npm start` and `npm run seed` load it via
+`--env-file-if-exists`. On Railway there is no `.env`; set the same names in the Variables tab.
+
 ```
 TELEGRAM_TOKEN            # from BotFather
 TELEGRAM_WEBHOOK_SECRET   # random string; set via setWebhook secret_token
 TELEGRAM_CHAT_ID          # the demo group's chat id
-ANTHROPIC_API_KEY
 ELEVENLABS_API_KEY
 ELEVENLABS_AGENT_ID
 CONTEXT_DEV_KEY
@@ -115,7 +117,11 @@ Serves `public/session.html`.
 Body: `{ token: string }` (the JWT from the link).
 1. Verify JWT (401 on bad/expired).
 2. Fetch messages where `sent_at > since`, cap 500.
-3. One Anthropic call → digest: `{ overview: string, topics: string[], action_items: string[] }`.
+3. Format them into one `missed_transcript` block, oldest first, one line per message
+   (`"today 9:14am — Priya: Morning all…"`). No summarization here — the ElevenLabs agent
+   already runs an LLM and does it in its opening turn. Capped at 6000 chars; when the cap
+   bites, the newest messages are kept and an `(earlier messages omitted)` marker is
+   prepended. Zero missed messages → `"(nothing new since they last caught up)"`.
 4. `GET https://api.elevenlabs.io/v1/convai/conversation/token?agent_id={ELEVENLABS_AGENT_ID}`
    with header `xi-api-key: {ELEVENLABS_API_KEY}` → conversation token.
 5. Respond:
@@ -125,8 +131,7 @@ Body: `{ token: string }` (the JWT from the link).
   "dynamic_variables": {
     "user_id": "...", "user_name": "...",
     "missed_count": 42, "since_human": "yesterday 3pm",
-    "digest_overview": "...", "digest_topics": "comma, separated",
-    "digest_action_items": "1. ... 2. ..."
+    "missed_transcript": "today 9:14am — Priya: …\ntoday 9:21am — Marcus: …"
   }
 }
 ```

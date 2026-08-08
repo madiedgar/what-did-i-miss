@@ -59,6 +59,11 @@ export function humanizeSince(sinceTs: number, now = Date.now()): string {
   return `${then.getDate()} ${then.toLocaleDateString('en-US', { month: 'short' })} ${clock}`;
 }
 
+function strings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+}
+
 function parseDigest(raw: string): Digest {
   const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '');
   const start = stripped.indexOf('{');
@@ -68,11 +73,7 @@ function parseDigest(raw: string): Digest {
       const parsed = JSON.parse(stripped.slice(start, end + 1)) as Partial<Digest>;
       const overview = typeof parsed.overview === 'string' ? parsed.overview.trim() : '';
       if (overview) {
-        return {
-          overview,
-          topics: (Array.isArray(parsed.topics) ? parsed.topics : []).map(String),
-          action_items: (Array.isArray(parsed.action_items) ? parsed.action_items : []).map(String),
-        };
+        return { overview, topics: strings(parsed.topics), action_items: strings(parsed.action_items) };
       }
     } catch {
       // fall through to raw text
@@ -81,13 +82,20 @@ function parseDigest(raw: string): Digest {
   return { overview: raw.trim(), topics: [], action_items: [] };
 }
 
+let client: Anthropic | undefined;
+
+/** Lazy so a missing key doesn't break boot — only /api/conversation-init needs it. */
+function anthropic(): Anthropic {
+  client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return client;
+}
+
 async function digestOf(messages: Message[]): Promise<Digest> {
   if (messages.length === 0) {
     return { overview: "Nothing new since you last caught up — you're all clear.", topics: [], action_items: [] };
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const res = await anthropic.messages.create({
+  const res = await anthropic().messages.create({
     model: MODEL,
     max_tokens: 1500,
     system: DIGEST_PROMPT,

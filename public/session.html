@@ -112,13 +112,14 @@
     </main>
 
     <script type="module">
-      import { Conversation } from 'https://esm.sh/@elevenlabs/client@1.17.0';
+      const SDK_URL = 'https://esm.sh/@elevenlabs/client@1.17.0';
 
       const statusEl = document.getElementById('status');
       const detailEl = document.getElementById('detail');
       const endBtn = document.getElementById('end');
 
       let conversation = null;
+      let failed = false;
 
       function render(state, status, detail = '') {
         document.body.dataset.state = state;
@@ -127,8 +128,17 @@
       }
 
       function fail(status, detail) {
+        failed = true;
         endBtn.hidden = true;
         render('error', status, detail);
+      }
+
+      async function teardown() {
+        try {
+          await conversation?.endSession();
+        } catch (err) {
+          console.error(err);
+        }
       }
 
       async function main() {
@@ -164,6 +174,9 @@
         const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
         probe.getTracks().forEach((track) => track.stop());
 
+        // Dynamic so a CDN failure surfaces in the error UI instead of killing the module.
+        const { Conversation } = await import(SDK_URL);
+
         conversation = await Conversation.startSession({
           conversationToken,
           dynamicVariables,
@@ -178,15 +191,18 @@
             if (status === 'connecting') render('connecting', 'Connecting…', detailEl.textContent);
             if (status === 'connected') render('listening', 'Listening…', detailEl.textContent);
             // onError fires before the socket closes; don't clobber the reason with "Call ended".
-            if (status === 'disconnected' && document.body.dataset.state !== 'error') {
+            if (status === 'disconnected' && !failed) {
               endBtn.hidden = true;
               render('ended', 'Call ended', 'Send /catchup in the chat to start another.');
             }
           },
-          onError: (message) => fail("Something went wrong", message ?? 'The call dropped unexpectedly.'),
+          onError: (message) => {
+            fail('Something went wrong', message ?? 'The call dropped unexpectedly.');
+            void teardown();
+          },
         });
 
-        endBtn.hidden = false;
+        if (!failed) endBtn.hidden = false;
       }
 
       endBtn.addEventListener('click', async () => {
@@ -199,8 +215,9 @@
         }
       });
 
-      main().catch((err) => {
+      main().catch(async (err) => {
         console.error(err);
+        await teardown();
         const denied = err?.name === 'NotAllowedError' || /permission|denied/i.test(err?.message ?? '');
         fail(
           denied ? 'Microphone blocked' : "Couldn't start the session",

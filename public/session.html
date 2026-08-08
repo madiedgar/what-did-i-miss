@@ -160,7 +160,9 @@
           `${dynamicVariables.missed_count} messages since ${dynamicVariables.since_human}`,
         );
 
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Permission probe only — the SDK opens its own stream, so release this one immediately.
+        const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+        probe.getTracks().forEach((track) => track.stop());
 
         conversation = await Conversation.startSession({
           conversationToken,
@@ -175,7 +177,8 @@
           onStatusChange: ({ status }) => {
             if (status === 'connecting') render('connecting', 'Connecting…', detailEl.textContent);
             if (status === 'connected') render('listening', 'Listening…', detailEl.textContent);
-            if (status === 'disconnected') {
+            // onError fires before the socket closes; don't clobber the reason with "Call ended".
+            if (status === 'disconnected' && document.body.dataset.state !== 'error') {
               endBtn.hidden = true;
               render('ended', 'Call ended', 'Send /catchup in the chat to start another.');
             }

@@ -63,7 +63,7 @@ const messagesSinceStmt = db.prepare(
 
 const searchStmt = db.prepare(
   `SELECT chat_id, message_id, sender, text, sent_at FROM messages
-   WHERE text LIKE ? COLLATE NOCASE AND sent_at > ?
+   WHERE chat_id = ? AND text LIKE ? COLLATE NOCASE AND sent_at > ?
    ORDER BY sent_at DESC, message_id DESC
    LIMIT ?`,
 );
@@ -109,8 +109,13 @@ export function getMessagesSince(chatId: string, sinceTs: number, limit = 500): 
   return messagesSinceStmt.all(chatId, sinceTs, limit) as Message[];
 }
 
-export function searchMessages(q: string, sinceTs?: number, limit = 20): Message[] {
-  return searchStmt.all(`%${q}%`, sinceTs ?? 0, limit) as Message[];
+export function searchMessages(
+  q: string,
+  sinceTs?: number,
+  chatId = process.env.TELEGRAM_CHAT_ID ?? '',
+  limit = 20,
+): Message[] {
+  return searchStmt.all(chatId, `%${q}%`, sinceTs ?? 0, limit) as Message[];
 }
 
 export function getMessagesRange(

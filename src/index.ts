@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import './db.js';
 import { telegram } from './telegram.js';
+import { chat } from './tools/chat.js';
 
 const app = new Hono();
 
@@ -31,8 +32,7 @@ app.get('/session', serveStatic({ path: './public/session.html' }));
 app.use('/public/*', serveStatic({ root: './' }));
 
 // [Session 2]
-app.route('/tools/search_chat', stub());
-app.route('/tools/get_messages', stub());
+app.route('/tools', chat);
 // [Session 3]
 app.route('/tools/verify_information', stub());
 // [Session 4]

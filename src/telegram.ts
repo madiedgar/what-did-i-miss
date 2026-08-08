@@ -44,10 +44,22 @@ function senderName(from: TelegramUser | undefined): string {
   return from?.first_name ?? from?.username ?? 'unknown';
 }
 
+/**
+ * Where a catch-up starts. The digest query is exclusive (`sent_at > since`), so a
+ * first-timer's floor steps back a second off the oldest message — anchoring exactly on
+ * it would drop that message from every first catch-up and undercount by one.
+ */
+function sinceFor(userId: string, chatId: string): number {
+  const marked = getMarker(userId)?.caught_up_at;
+  if (marked !== undefined) return marked;
+  const earliest = getEarliestSentAt(chatId);
+  return earliest === null ? 0 : earliest - 1;
+}
+
 function catchupLink(msg: TelegramMessage): string {
   const chatId = String(msg.chat.id);
   const userId = String(msg.from?.id ?? '');
-  const marker = getMarker(userId)?.caught_up_at ?? getEarliestSentAt(chatId) ?? 0;
+  const marker = sinceFor(userId, chatId);
   const token = jwt.sign(
     { user_id: userId, user_name: senderName(msg.from), chat_id: chatId, since: marker },
     process.env.SESSION_JWT_SECRET as string,

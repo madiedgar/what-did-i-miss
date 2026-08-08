@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import './db.js';
+import { init } from './init.js';
 import { telegram } from './telegram.js';
 import { chat } from './tools/chat.js';
 import { devinTools } from './tools/devin.js';
@@ -27,8 +28,7 @@ app.get('/health', (c) => c.json({ ok: true }));
 
 app.route('/telegram/webhook', telegram);
 
-// [Session 1] replaces these two lines with its own routers.
-app.route('/api/conversation-init', stub());
+app.route('/api/conversation-init', init);
 app.get('/session', serveStatic({ path: './public/session.html' }));
 app.use('/public/*', serveStatic({ root: './' }));
 

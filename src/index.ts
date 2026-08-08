@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import './db.js';
 import { telegram } from './telegram.js';
 import { chat } from './tools/chat.js';
+import { devinTools } from './tools/devin.js';
 
 const app = new Hono();
 
@@ -35,10 +36,8 @@ app.use('/public/*', serveStatic({ root: './' }));
 app.route('/tools', chat);
 // [Session 3]
 app.route('/tools/verify_information', stub());
-// [Session 4]
-app.route('/tools/dispatch_to_devin', stub());
-app.route('/tools/check_devin_sessions', stub());
-app.route('/tools/mark_caught_up', stub());
+// [Session 4] dispatch_to_devin, check_devin_sessions, mark_caught_up
+app.route('/tools', devinTools);
 
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port });

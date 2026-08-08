@@ -6,6 +6,7 @@ import { init } from './init.js';
 import { telegram } from './telegram.js';
 import { chat } from './tools/chat.js';
 import { devinTools } from './tools/devin.js';
+import { verify } from './tools/verify.js';
 
 const app = new Hono();
 
@@ -35,7 +36,7 @@ app.use('/public/*', serveStatic({ root: './' }));
 // [Session 2]
 app.route('/tools', chat);
 // [Session 3]
-app.route('/tools/verify_information', stub());
+app.route('/tools', verify);
 // [Session 4] dispatch_to_devin, check_devin_sessions, mark_caught_up
 app.route('/tools', devinTools);
 

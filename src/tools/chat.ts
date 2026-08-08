@@ -34,7 +34,7 @@ chat.post('/search_chat', async (c) => {
   }
 
   try {
-    const results = searchMessages(query, since_ts, 20).map(toToolMessage);
+    const results = searchMessages(query, since_ts).map(toToolMessage);
     return c.json({ results });
   } catch (e) {
     console.error('search_chat failed:', e);
